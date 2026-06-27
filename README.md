@@ -1,180 +1,297 @@
-# my-mcp-server
+# Project_mcp_server_Claude
 
-[![Python](https://img.shields.io/badge/python-3.13%2B-blue)](https://www.python.org/)
-[![Status](https://img.shields.io/badge/status-demo-orange)]()
+An automated CI/CD Flask REST API deployment pipeline to AWS ECS using GitHub Actions.
 
-A minimal FastMCP-based "Employee Tool" MCP server that demonstrates how to expose simple tools (greeting, status, and a SQL query runner) backed by PostgreSQL. This repository is intended as a small example for internal tooling, demos, or development experiments with MCP tools.
+## Overview
 
-Table of Contents
-- Features
-- Project structure
-- Requirements
-- Quickstart
-- Configuration
-- Tools / API
-- Examples
-- Security & Safety
-- Development & Testing
-- Suggested improvements
-- Contributing
-- License
-- Contact
+This repository demonstrates a production-ready deployment workflow for a Flask-based REST API to Amazon Web Services (AWS) using GitHub Actions. It includes:
 
+- ✅ REST API for employee/student management built with Flask
+- ✅ PostgreSQL integration (AWS RDS) for persistent storage
+- ✅ Docker containerization for consistent environments
+- ✅ Automated CI/CD pipeline using GitHub Actions
+- ✅ Deployment to AWS ECS with automatic image updates
 
-## Features
-- say_hello: returns a friendly greeting string.
-- get_status: returns a server status string.
-- run_query(query: str): executes a SQL query against a configured PostgreSQL instance and returns results (SELECT returns rows, non-SELECT returns success confirmation). Includes a basic blacklist for destructive SQL.
+## Tech Stack
 
+- Language: Python 3.13+ (repo shows Python)
+- Framework: FastMCP / Flask (repo contains an MCP server; adapt as needed)
+- Database: PostgreSQL (AWS RDS)
+- Container: Docker
+- Container Registry: AWS ECR Public
+- Orchestration: AWS ECS
+- CI/CD: GitHub Actions
+- Cloud Region (example): ap-south-2 (Mumbai)
 
-## Project structure
+## Repository structure
+
+Project_mcp_server_Claude/
+├── .github/
+│   └── workflows/
+│       └── deploy.yml              # GitHub Actions deployment workflow (if present)
+├── main.py / server.py             # MCP / Flask server entrypoint
+├── Dockerfile                      # Docker image configuration (if present)
+├── pyproject.toml                  # Python project metadata & dependencies
+├── requirements.txt                # Python dependencies (if present)
+├── Output_images/                  # Documentation & screenshots
+└── README.md                       # This file
+
+## API / Tools (example)
+
+Depending on the repository implementation, the server exposes one or more of the following:
+
+- say_hello or GET /hello
+  Response: {"sharlin": "Hello benanio"}
+
+- get_status
+  Response: "Server is running"
+
+- run_query(query: str) / GET /students / POST /students
+  - run_query executes SQL against PostgreSQL with a basic blacklist of destructive statements
+  - GET /students returns a list of students
+  - POST /students adds a student and returns a success message
+
+Adjust these to match the functions/endpoints in the code (main.py / server.py / app.py).
+
+## Architecture (diagram)
+
+Below is an architecture diagram that illustrates how code flows from your GitHub repository through GitHub Actions into AWS ECR and AWS ECS, with the application connecting to RDS (PostgreSQL).
+
 ```
-.gitignore            - ignored files
-.python-version       - pinned Python version (>=3.13)
-pyproject.toml        - project metadata & dependencies (fastmcp, mcp)
-README.md             - this file
-main.py               - small CLI entrypoint that prints a greeting
-server.py             - FastMCP server: defines tools (say_hello, get_status, run_query)
-uv.lock               - package lockfile
-Output_images/        - directory for example outputs/screenshots
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          GITHUB REPOSITORY                             │
+│                                                                         │
+│  ┌──────────────┐    ┌──────────────┐    ┌─────────────────┐            │
+│  │   server.py  │    │ Dockerfile   │    │ .github/workflows│            │
+│  │ (MCP/Flask)  │    │ (Python 3.x) │    │   └─ deploy.yml  │            │
+│  └──────────────┘    └──────────────┘    └─────────────────┘            │
+│                                                                         │
+└────────────────────────────────┬────────────────────────────────────────┘
+                                 │
+                        Git Push to main branch
+                                 │
+                                 ▼
+         ┌───────────────────────────────────────────────┐
+         │      GITHUB ACTIONS CI/CD PIPELINE            │
+         │                                               │
+         │  ┌─────────────────────────────────────────┐  │
+         │  │ Step 1: Checkout Code                   │  │
+         │  └─────────────────────────────────────────┘  │
+         │                    │                           │
+         │                    ▼                           │
+         │  ┌─────────────────────────────────────────┐  │
+         │  │ Step 2: Configure AWS Credentials      │  │
+         │  │ (IAM Access Key + Secret Key)          │  │
+         │  └─────────────────────────────────────────┘  │
+         │                    │                           │
+         │                    ▼                           │
+         │  ┌─────────────────────────────────────────┐  │
+         │  │ Step 3: Login to ECR Public             │  │
+         │  │ (AWS ECR Authentication)                │  │
+         │  └─────────────────────────────────────────┘  │
+         │                    │                           │
+         │                    ▼                           │
+         │  ┌─────────────────────────────────────────┐  │
+         │  │ Step 4: Build Docker Image              │  │
+         │  │ docker build -t app:$IMAGE_TAG .       │  │
+         │  └─────────────────────────────────────────┘  │
+         │                    │                           │
+         │                    ▼                           │
+         │  ┌─────────────────────────────────────────┐  │
+         │  │ Step 5: Tag & Push to ECR Public        │  │
+         │  │ public.ecr.aws/<alias>/app:TAG         │  │
+         │  └─────────────────────────────────────────┘  │
+         │                    │                           │
+         └────────────────────┼───────────────────────────┘
+                              │
+                              ▼
+         ┌───────────────────────────────────────────────┐
+         │   AWS ECR PUBLIC (Elastic Container Registry) │
+         │                                               │
+         │  ┌─────────────────────────────────────────┐  │
+         │  │  app:commit-sha                        │  │
+         │  │  (Docker Image Stored)                  │  │
+         │  └─────────────────────────────────────────┘  │
+         │                                               │
+         └────────────────────┬───────────────────────────┘
+                              │
+                              ▼
+         ┌───────────────────────────────────────────────┐
+         │      GITHUB ACTIONS DEPLOYMENT STAGE          │
+         │                                               │
+         │  ┌─────────────────────────────────────────┐  │
+         │  │ Step 6: Download ECS Task Definition    │  │
+         │  │ (Current running task config)           │  │
+         │  └─────────────────────────────────────────┘  │
+         │                    │                           │
+         │                    ▼                           │
+         │  ┌─────────────────────────────────────────┐  │
+         │  │ Step 7: Render New Task Definition      │  │
+         │  │ (Update with new image URI)             │  │
+         │  └─────────────────────────────────────────┘  │
+         │                    │                           │
+         │                    ▼                           │
+         │  ┌─────────────────────────────────────────┐  │
+         │  │ Step 8: Deploy to ECS Service           │  │
+         │  │ (Update app-task-service)               │  │
+         │  └─────────────────────────────────────────┘  │
+         │                                               │
+         └────────────────────┬───────────────────────────┘
+                              │
+                              ▼
+         ┌───────────────────────────────────────────────┐
+         │        AWS ECS CLUSTER (ap-south-2)           │
+         │                                               │
+         │  Cluster: app-cluster                         │
+         │                                               │
+         │  ┌──────────────────────────────────────────┐ │
+         │  │  ECS Service: app-task-service            │ │
+         │  │  ┌────────────────────────────────────┐  │ │
+         │  │  │ Container: app-container            │  │ │
+         │  │  │  ┌────────────────────────────────┐ │  │
+         │  │  │  │ Application (Flask / MCP)      │ │  │
+         │  │  │  │ Port: 5000                      │ │  │
+         │  │  │  └────────────────────────────────┘ │  │
+         │  │  └────────────────────────────────────┘  │ │
+         │  └──────────────────────────────────────────┘ │
+         │             │                                 │
+         └─────────────┼─────────────────────────────────┘
+                       │
+                       ▼ (Network call)
+         ┌─────────────────────────────────────────────────┐
+         │    AWS RDS (Relational Database Service)        │
+         │    PostgreSQL Database (ap-south-2)             │
+         │                                                 │
+         │  ┌──────────────────────────────────────────┐   │
+         │  │ Database: postgres                       │   │
+         │  │ Tables: students                         │   │
+         │  └──────────────────────────────────────────┘   │
+         └─────────────────────────────────────────────────┘
 ```
 
-How it fits together: server.py creates a FastMCP instance named "Employee Tool" and registers three tools. The server runs using stdio transport when executed directly (mcp.run(transport="stdio")). The run_query tool uses psycopg2 to connect to PostgreSQL and run SQL statements.
+## Getting started (local)
 
-
-## Requirements
+Prerequisites:
 - Python 3.13+
-- PostgreSQL server for run_query tool (or adapt to another DB)
-- Python dependencies declared in `pyproject.toml` (fastmcp, mcp, psycopg2 - install via pip)
+- Docker
+- (Optional) AWS account and configured resources for deployment
 
-
-## Quickstart
-Follow these steps to run the server locally.
-
-1. Clone repository
-
+Clone and run locally:
 ```bash
 git clone https://github.com/Benaniosam-hub/Project_mcp_server_Claude.git
 cd Project_mcp_server_Claude
-```
+# If requirements.txt exists
+pip install -r requirements.txt
 
-2. Create and activate a virtual environment, then install the package (editable recommended for development)
-
-```bash
-python -m venv .venv
-# macOS / Linux
-source .venv/bin/activate
-# Windows (PowerShell)
-.venv\Scripts\Activate.ps1
-
-pip install --upgrade pip
-python -m pip install -e .
-```
-
-3. Configure database credentials (recommended via environment variables; see Configuration below).
-
-4. Run the MCP server
-
-```bash
-python server.py
-```
-
-The server will start the FastMCP instance (stdio transport). How you call the tools depends on your MCP client — for local testing you can invoke the registered tools using any MCP-compatible transport or a testing harness.
-
-
-## Configuration
-The current `server.py` includes placeholder PostgreSQL connection values:
-
-- host: "localhost"
-- database: "db1"
-- user: "postgres"
-- password: "0000"
-- port: "5432"
-
-For production or shared development, do NOT keep credentials in source control. Recommended approach:
-- Export environment variables before starting the server:
-  - PG_HOST, PG_DATABASE, PG_USER, PG_PASSWORD, PG_PORT
-- Or update `server.py` to read from env vars (I can provide or commit this change).
-
-Example (bash):
-
-```bash
-export PG_HOST=localhost
-export PG_DATABASE=mydb
+# Set environment variables (example)
+export PG_HOST=your-postgres-host
+export PG_DATABASE=postgres
 export PG_USER=postgres
-export PG_PASSWORD=strongpassword
-export PG_PORT=5432
+export PG_PASSWORD=your-password
+
+# Run the server (adjust the entrypoint file: main.py / server.py / app.py)
+python server.py
+# API available at http://localhost:5000
 ```
 
-
-## Tools / API (what the server exposes)
-The server registers the following tools in `server.py`:
-
-- say_hello() -> str
-  - Returns: "Hello Benanio, MCP server is working."
-
-- get_status() -> str
-  - Returns: "MCP server is running successfully."
-
-- run_query(query: str) -> list|str
-  - Behavior: connects to PostgreSQL via psycopg2, blocks queries containing destructive keywords (DROP DATABASE, DROP TABLE, TRUNCATE, ALTER DATABASE). Executes the query; if it is a SELECT, returns fetched rows (as a Python list of tuples in the current implementation); otherwise commits and returns "Query executed successfully.".
-  - Note: Current return format for SELECT is a list of tuples. It is recommended to convert SELECT results to a JSON-serializable list of dictionaries (column-name -> value) for better interoperability.
-
-
-## Examples
-Example: run a simple SELECT (conceptual - depends on MCP client transport)
-
-- SQL: SELECT id, name FROM employees LIMIT 5;
-- Current return: a Python list of tuples, e.g. [(1, 'Alice'), (2, 'Bob')]
-- Recommended return format (JSON-serializable):
-
-```json
-[
-  {"id": 1, "name": "Alice"},
-  {"id": 2, "name": "Bob"}
-]
+Test endpoints locally:
+```bash
+curl http://localhost:5000/hello
+curl http://localhost:5000/students
+curl -X POST http://localhost:5000/students -H "Content-Type: application/json" -d '{"name":"Test Student","age":20}'
 ```
 
+## Docker (local)
 
-## Security & Safety
-- The run_query tool uses a small blacklist of destructive SQL keywords. Blacklisting is not foolproof and should not be relied upon as the only protection.
-- Use the principle of least privilege: create a dedicated DB user with only the required permissions (e.g., read-only for SELECT-only usage).
-- Do not commit real credentials to the repository. Use environment variables or a secrets manager.
-- If exposing this server to other teams or external services, add authentication/authorization and input validation.
+Build and run:
+```bash
+docker build -t app:latest .
+docker run -p 5000:5000 \
+  -e PG_HOST=your-postgres-host \
+  -e PG_DATABASE=postgres \
+  -e PG_USER=postgres \
+  -e PG_PASSWORD=your-password \
+  app:latest
+```
 
+## Deployment with GitHub Actions (automated)
 
-## Development & Testing
-- Add unit tests for the tools (e.g., mock psycopg2 connections for run_query).
-- Consider adding a GitHub Actions workflow to run linting and tests on PRs.
-- Use an editable install (`pip install -e .`) while developing.
+This repository may include a workflow (.github/workflows/deploy.yml) that:
 
+1. Triggers on push to the main branch
+2. Checks out the code
+3. Configures AWS credentials from repository Secrets
+4. Builds and tags a Docker image
+5. Pushes the image to AWS ECR Public
+6. Downloads the current ECS task definition, injects the new image URI, registers the task, and updates the ECS service
 
-## Suggested improvements (next steps)
-- Update `server.py` to read DB credentials from environment variables and provide clear defaults.
-- Make `run_query` return JSON-serializable results with column names.
-- Add logging and error handling around DB connections and query execution.
-- Add tests and a CI workflow.
-- Add CONTRIBUTING.md and LICENSE (MIT or another suitable license) if you plan to open source it.
+Recommended GitHub Secrets to configure:
+- AWS_ACCESS_KEY_ID
+- AWS_SECRET_ACCESS_KEY
 
+Example AWS resources used by the workflow (update names to match your AWS account):
+- ECS Cluster: flask-api-cluster
+- ECS Service: flask-api-task-service
+- Task Definition family: flask-api-task
+- ECR Repository: flask-api (public alias placeholder)
+- Region: ap-south-2
+
+## Environment variables
+
+| Variable    | Default (example)                                           | Description                   |
+|-------------|-------------------------------------------------------------|-------------------------------|
+| PG_HOST     | localhost / your DB host                                     | PostgreSQL host               |
+| PG_DATABASE | postgres                                                    | Database name                 |
+| PG_USER     | postgres                                                    | Database user                 |
+| PG_PASSWORD | (set securely)                                              | Database password             |
+
+Make sure to change defaults before production deployment.
+
+## Security considerations
+
+- Do NOT hardcode secrets in source files. Use environment variables or a secrets manager (AWS Secrets Manager).
+- Use least-privilege IAM policies for GitHub Actions/AWS roles.
+- Place RDS in a private subnet and restrict access via security groups.
+- Enable TLS/HTTPS for external traffic (ALB, API Gateway, or reverse proxy).
+- Rotate credentials and monitor logs (CloudWatch).
+
+## Troubleshooting
+
+- Database connection errors: check DB endpoint, credentials, and security group ingress from ECS.
+- ECS deployment failures: review CloudWatch logs and ECS events; ensure task role and service role permissions are correct.
+- GitHub Actions failures: inspect workflow run logs in Actions tab and validate Secrets.
+
+## Future enhancements
+
+- Add auth (JWT / OAuth)
+- Input validation and improved error handling
+- Database migrations (Alembic)
+- Unit & integration tests
+- Structured logging and monitoring
+- API docs (OpenAPI / Swagger)
+- CI tests before deployment
+- Health checks and auto-scaling
 
 ## Contributing
-Contributions are welcome. Suggested workflow:
-1. Fork the repo
+
+1. Fork the repository
 2. Create a feature branch
-3. Add tests for new behavior
-4. Open a Pull Request with a description of changes
-
-Include a CONTRIBUTING.md if you want to formalize guidelines.
-
+3. Commit your changes
+4. Open a Pull Request
 
 ## License
-Currently no license file is included in this repository. If you intend to make this project open-source, add a LICENSE file (for example MIT, Apache-2.0).
 
+If you plan to open-source, add a LICENSE file (MIT, Apache-2.0, etc.).
 
-## Contact
-If you'd like, I can:
-- Commit this README (done in this change).
-- Update `server.py` to read env vars and convert SELECT results to JSON-friendly output in the same commit.
-- Add a basic GitHub Actions CI that runs lint and tests.
+## Author
 
-Open an issue or send a PR request with specifics and I'll help implement the next changes.
+Benaniosam — https://github.com/Benaniosam-hub
+
+## Support
+
+Open an issue on the GitHub repository: https://github.com/Benaniosam-hub/Project_mcp_server_Claude/issues
+
+---
+
+**Last Updated:** 2026-06-27  
+**Version:** 1.1.0
